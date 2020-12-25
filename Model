@@ -1,0 +1,57 @@
+SET vDateFormat = 'YYYY.MM.DD';
+
+Temp_Main:
+Load
+      Date(Date#([Date],'MMM D, YYYY'),'$(vDateFormat)') as [Trade Date]
+    , Price as [Trade Close]
+    , Open-Price as [OpenClose Diff.]
+;
+LOAD
+      Date
+    , Price
+    , Open
+    , High
+    , Low
+    , [Change %]
+FROM [lib://DataFiles/S&P 500 Historical Data.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+NoConcatenate
+
+DayDiff:
+Load
+      *
+    , WeekName([Trade Date]) as [Trade Year Week]
+    , WeekDay([Trade Date]) as [Trade Week Day]
+    , Date(WeekEnd([Trade Date],0,5),'$(vDateFormat)') as [Trade WeekEnd]
+    , [Trade Close]-Peek([Trade Close]) as [Day Diff.]
+Resident Temp_Main
+Where WeekDay([Trade Date])='Fri' or [Trade Date] = '2020.12.24'
+Order by [Trade Date] asc
+;
+
+NoConcatenate
+
+WeekDiff:
+Load
+      *
+    , RangeSum([Current Week Diff.],[Previous Week Diff.]) as [2WeekSum]
+    , RangeSum([Current Week Diff.],[Previous Week Diff.],[Two Weeks Ago Diff.]) as [3WeekSum]
+;
+Load
+      *
+    , Peek([Previous Week Diff.]) as [Two Weeks Ago Diff.]
+;
+Load
+      *
+    , Peek([Current Week Diff.]) as [Previous Week Diff.]
+;
+Load
+      [Trade Year Week]
+    , Sum([Day Diff.]) as [Current Week Diff.]
+Resident DayDiff
+Group by [Trade Year Week]
+Order by [Trade Year Week]
+;
+
+Drop Table Temp_Main;
